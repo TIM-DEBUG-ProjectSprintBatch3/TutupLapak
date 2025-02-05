@@ -3,6 +3,7 @@ package di
 import (
 	authJwt "github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/auth/jwt"
 	"github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/database/postgre"
+	protoProductController "github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/grpc/controller/product/proto"
 	"github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/http/controller"
 	loggerZap "github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/logger/zap"
 	"github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/repository"
@@ -44,4 +45,7 @@ func init() {
 	//? Setup Controller/Handler
 	//? Product Controller
 	do.Provide[controller.ProductControllerInterface](Injector, controller.NewInject)
+
+	//? GRPC Controller
+	do.Provide[*protoProductController.ProtoProductController](Injector, protoProductController.NewProtoProductControllerInject)
 }
