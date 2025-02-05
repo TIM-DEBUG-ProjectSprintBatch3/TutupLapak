@@ -36,7 +36,7 @@ go get -u github.com/golang/protobuf/protoc-gen-go
 go get -u google.golang.org/protobuf
 ```
 ## Setup
-1. Buat dulu kontrak proto nya, bisa copas .proto di ./services/user/proto
+1. Buat dulu kontrak proto nya, bisa copas .proto di ./services/user/proto atau satu direktori dengan ./[nama_service]
 2. Jalankan protoc untuk generate grpc golang services
 ```bash
 protoc --go_out=plugins=grpc:. ./proto/*.proto

@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+// File ini dikelola oleh:
+// Nama Maintainer   : ad1ee
+// Email Maintainer  : mas.setyo.main@gmail.com
+// Deskripsi         : File ini mendefinisikan PurchaseService yang menyediakan
+//                     API gRPC untuk mengambil detail pengguna berdasarkan User ID.
+
+// Definisi Package di Golang. Ketika protobuf digenerate, maka akan mengikuti struktur folder berikut.
+option go_package = "src/service/proto/product";
+
+// Definisi package
+package product;
+
+// Request Payload
+message ProductRequest {
+  repeated string productIds = 1; // Larik string untuk menerima beberapa ID pengguna
+}
+
+// Response Payload
+message ProductWithIdResponse {
+  string productId = 1;
+  string name = 2;
+  string category = 3;
+  int32 qty = 4;
+  double price = 5;
+  string sku = 6;
+  string fileId = 7;
+  string fileUri = 8;
+  string fileThumbnailUri = 9;
+  string createdAt = 10;
+  string updatedAt = 11;
+  string sellerId = 12;
+}
+
+
+// Response untuk banyak produk
+message ProductsWithIdResponse {
+  repeated ProductWithIdResponse products = 1; // Larik ProductWithIdResponse untuk beberapa pengguna
+}
+
+// Define RPC service 
+service ProductService {
+  rpc GetProductDetailsWithId(ProductRequest) returns (ProductWithIdResponse); // Mendapatkan detail dari produk
+}
