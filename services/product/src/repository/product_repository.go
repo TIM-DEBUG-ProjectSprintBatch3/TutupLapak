@@ -3,12 +3,14 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/exceptions"
 	"github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/model/dtos/request"
 	"github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/model/entity"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
 )
@@ -150,4 +152,98 @@ func (pr *ProductRepository) GetAll(ctx context.Context, pool *pgxpool.Pool, fil
 	}
 
 	return products, nil
+}
+
+func (this *ProductRepository) GetProducts(ctx context.Context, tx pgx.Tx, filter request.ProductFilter, productIds []string) ([]entity.Product, error) {
+	var args []interface{}
+	argCounter := 1
+	var queryBuilder strings.Builder
+
+	queryBuilder.WriteString(`
+	SELECT 
+		p.id, p.name, p.category, p.qty, p.price, p.sku, p.file_id, p.created_at, p.updated_at 
+	FROM products p`)
+
+	// Join ke orders kalau pakai "sold-xxx"
+	if strings.HasPrefix(filter.SortBy, "sold-") {
+		queryBuilder.WriteString(" LEFT JOIN orders o ON p.id = o.product_id")
+	}
+
+	queryBuilder.WriteString(" WHERE ")
+
+	var conditions []string
+
+	if filter.ProductId != "" {
+		conditions = append(conditions, fmt.Sprintf("p.id = $%d", argCounter))
+		args = append(args, filter.ProductId)
+		argCounter++
+	}
+
+	if filter.Sku != "" {
+		conditions = append(conditions, fmt.Sprintf("p.sku = $%d", argCounter))
+		args = append(args, filter.Sku)
+		argCounter++
+	}
+
+	if filter.Category != "" {
+		conditions = append(conditions, fmt.Sprintf("p.category = $%d", argCounter))
+		args = append(args, filter.Category)
+		argCounter++
+	}
+
+	// Tambahin kondisi ke query
+	if len(conditions) > 0 {
+		queryBuilder.WriteString(strings.Join(conditions, " AND "))
+	} else {
+		queryBuilder.WriteString(" TRUE") // Biar gak error kalau gak ada filter
+	}
+
+	// Sorting
+	switch filter.SortBy {
+	case "newest":
+		queryBuilder.WriteString(" ORDER BY p.updated_at DESC, p.created_at DESC")
+	case "cheapest":
+		queryBuilder.WriteString(" ORDER BY p.price ASC")
+	default:
+		if strings.HasPrefix(filter.SortBy, "sold-") {
+			parts := strings.Split(filter.SortBy, "-")
+			if len(parts) == 2 {
+				if soldCount, err := strconv.Atoi(parts[1]); err == nil {
+					queryBuilder.WriteString(fmt.Sprintf(" GROUP BY p.id ORDER BY COALESCE(SUM(o.sales), 0) DESC LIMIT $%d", argCounter))
+					args = append(args, soldCount)
+					argCounter++
+				}
+			}
+		}
+	}
+
+	// Offset & Limit
+	if filter.Offset > 0 {
+		queryBuilder.WriteString(fmt.Sprintf(" OFFSET $%d", argCounter))
+		args = append(args, filter.Offset)
+		argCounter++
+	}
+
+	if filter.Limit > 0 {
+		queryBuilder.WriteString(fmt.Sprintf(" LIMIT $%d", argCounter))
+		args = append(args, filter.Limit)
+		argCounter++
+	}
+
+	// Eksekusi query pakai tx, bukan pool
+	query := queryBuilder.String()
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Optimasi pakai CollectRows
+	products, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (entity.Product, error) {
+		var p entity.Product
+		err := row.Scan(&p.Id, &p.Name, &p.Category, &p.Qty, &p.Price, &p.Sku, &p.FileId, &p.CreatedAt, &p.UpdatedAt)
+		return p, err
+	})
+
+	return products, err
 }

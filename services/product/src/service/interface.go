@@ -12,4 +12,6 @@ type ProductServiceInterface interface {
 	DeletedById(ctx context.Context, productId string, userId string) error
 	UpdateById(ctx context.Context, payload request.ProductUpdate) (response.ProductCreate, error)
 	GetAll(ctx context.Context, filter request.ProductFilter) ([]response.ProductCreate, error)
+
+	GetProducts(ctx context.Context, productIds []string) ([]response.ProductCreate, error)
 }

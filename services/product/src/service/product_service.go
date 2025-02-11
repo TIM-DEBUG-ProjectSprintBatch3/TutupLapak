@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/exceptions"
@@ -11,6 +12,8 @@ import (
 	"github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/model/entity"
 	"github.com/TIM-DEBUG-ProjectSprintBatch3/go-fiber-template/src/repository"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
 )
@@ -171,4 +174,43 @@ func (ps *ProductService) GetAll(ctx context.Context, filter request.ProductFilt
 	}
 
 	return productResponses, nil
+}
+
+func (this *ProductService) GetProducts(ctx context.Context, productIds []string) ([]response.ProductCreate, error) {
+	requestId := uuid.New()
+	response := []response.ProductCreate{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Dapatkan koneksi dari pool (dengan menunggu jika pool penuh)
+	start := time.Now()
+
+	conn, err := this.DB.Acquire(ctx)
+	if err != nil {
+		this.Logger.Error(err.Error(), functionCallerInfo.PurchaserServiceSaveCart, "Acquire Connection", fmt.Sprintf("RequestID:%s|WaitTime:%v", requestId, time.Since(start)))
+		return nil, err
+	}
+	defer conn.Release()
+
+	// Gunakan koneksi dari pool
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
+	if err != nil {
+		this.Logger.Error(err.Error(), functionCallerInfo.PurchaserServiceSaveCart, "Begin Transaction", fmt.Sprintf("RequestID:%s", requestId))
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Eksekusi Query
+	_filter := request.ProductFilter{}
+	fetchedProducts, err := this.ProductRepo.GetProducts(ctx, tx, _filter, productIds)
+
+	// Commit transaksi jika sukses
+	if err := tx.Commit(ctx); err != nil {
+		this.Logger.Error(err.Error(), functionCallerInfo.PurchaserServiceSaveCart, fmt.Sprintf("RequestID:%s", requestId))
+		tx.Rollback(ctx)
+		return nil, err
+	}
+
+	return nil, nil
 }
